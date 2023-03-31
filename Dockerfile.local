@@ -58,10 +58,12 @@ RUN GIT_VERSION=$service_controller_git_version && \
     go build -ldflags="-X ${VERSION_PKG}.GitVersion=${GIT_VERSION} \
     -X ${VERSION_PKG}.GitCommit=${GIT_COMMIT} \
     -X ${VERSION_PKG}.BuildDate=${BUILD_DATE}" \
+    -gcflags='all=-N -l' \
     -modfile="${work_dir}/go.local.mod" \
     -a -o $work_dir/bin/controller $work_dir/cmd/controller/main.go
 
-FROM $base_image
+#FROM $base_image
+FROM $builder_image
 ARG service_alias
 ARG work_dir=/github.com/aws-controllers-k8s/$service_alias-controller
 WORKDIR /
