@@ -40,6 +40,10 @@ RUN go mod download
 COPY $service_alias-controller/apis $work_dir/apis
 COPY $service_alias-controller/cmd $work_dir/cmd
 COPY $service_alias-controller/pkg $work_dir/pkg
+
+# Install delve for debugging
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+
 # Build
 RUN GIT_VERSION=$service_controller_git_version && \
     GIT_COMMIT=$service_controller_git_commit && \
@@ -47,13 +51,18 @@ RUN GIT_VERSION=$service_controller_git_version && \
     go build -ldflags="-X ${VERSION_PKG}.GitVersion=${GIT_VERSION} \
     -X ${VERSION_PKG}.GitCommit=${GIT_COMMIT} \
     -X ${VERSION_PKG}.BuildDate=${BUILD_DATE}" \
+    -gcflags='all=-N -l' \
     -a -o $work_dir/bin/controller $work_dir/cmd/controller/main.go
 
-FROM $base_image
+
+#FROM $base_image
+FROM $builder_image:$golang_version
 ARG service_alias
 ARG work_dir=/github.com/aws-controllers-k8s/$service_alias-controller
 WORKDIR /
 COPY --from=builder $work_dir/bin/controller $work_dir/LICENSE $work_dir/ATTRIBUTION.md /bin/
+COPY --from=builder /go/bin/dlv /bin/dlv
 # Make this image non-root by default
 USER 1000
-ENTRYPOINT ["/bin/controller"]
+EXPOSE 40000
+ENTRYPOINT ["/bin/dlv", "exec", "--continue", "--headless", "--accept-multiclient", "--api-version", "2", "--listen", "0.0.0.0:40000", "/bin/controller", "--"]
